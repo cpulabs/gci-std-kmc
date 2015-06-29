@@ -18,54 +18,54 @@
 
 module gci_std_kmc
 	#(
-		parameter		BUFFER_COUNT		=		32,
-		parameter		BUFFER_COUNT_N		=		5
+		parameter BUFFER_COUNT = 32,
+		parameter BUFFER_COUNT_N = 5
 	)(
-		input				iCLOCK,
-		input				inRESET,
+		input iCLOCK,
+		input inRESET,
 		//BUS(DATA)-Input
-		input				iDEV_REQ,
-		output				oDEV_BUSY,
-		input				iDEV_RW,
-		input	[31:0]		iDEV_ADDR,
-		input	[31:0]		iDEV_DATA,
+		input iDEV_REQ,
+		output oDEV_BUSY,
+		input iDEV_RW,
+		input [31:0] iDEV_ADDR,
+		input [31:0] iDEV_DATA,
 		//BUS(DATA)-Output
-		output				oDEV_REQ,
-		input				iDEV_BUSY,
-		output	[31:0]		oDEV_DATA,
+		output oDEV_REQ,
+		input iDEV_BUSY,
+		output [31:0] oDEV_DATA,
 		//IRQ
-		output				oDEV_IRQ_REQ,
-		input				iDEV_IRQ_BUSY,
-		output	[23:0]		oDEV_IRQ_DATA,
-		input				iDEV_IRQ_ACK,
+		output oDEV_IRQ_REQ,
+		input iDEV_IRQ_BUSY,
+		output [23:0] oDEV_IRQ_DATA,
+		input iDEV_IRQ_ACK,
 		//PS2
-		input				iPS2_CLOCK,
-		input				iPS2_DATA
+		input iPS2_CLOCK,
+		input iPS2_DATA
 	);
 
 	/************************************************************
 	Wire & Register
 	************************************************************/
 	//Data Output Buffer
-	reg					b_req;
-	reg		[31:0]		b_data;
+	reg b_req;
+	reg [31:0] b_data;
 	//PS2 Interface
-	wire				ps2_if_req;
-	wire	[7:0]		ps2_if_data;
+	wire ps2_if_req;
+	wire [7:0] ps2_if_data;
 	//Write Condition
-	wire				specialmemory_use_condition;
-	wire				queue_write_condition;
-	wire				data_rd_condition;
-	wire				irq_rd_condition;
+	wire specialmemory_use_condition;
+	wire queue_write_condition;
+	wire data_rd_condition;
+	wire irq_rd_condition;
 	//Special Memory
-	wire	[31:0]		special_memory_rd_data;
+	wire [31:0] special_memory_rd_data;
 	//Keyboard Queue
-	wire				data_fifo_full;
-	wire				data_fifo_empty;
-	wire	[7:0]		data_fifo_data;
+	wire data_fifo_full;
+	wire data_fifo_empty;
+	wire [7:0] data_fifo_data;
 	//IRQ Buffer
-	wire				irq_counter_full;
-	wire				irq_counter_empty;
+	wire irq_counter_full;
+	wire irq_counter_empty;
 
 	/************************************************************
 	PS2 Interface
@@ -84,10 +84,10 @@ module gci_std_kmc
 	/************************************************************
 	Condition CTRL
 	************************************************************/
-	assign				specialmemory_use_condition	=		iDEV_REQ && iDEV_ADDR < 32'h00000400;
-	assign				queue_write_condition		=		ps2_if_req && !data_fifo_full;// && !irq_counter_full;
-	assign				data_rd_condition			=		/*!data_fifo_empty && 2011/10/05*/(iDEV_REQ && iDEV_ADDR == 32'h00000400);                //iDEV_REQ & (iDEV_ADDR < 32'h00000100);
-	assign				irq_rd_condition			=		!irq_counter_empty && !iDEV_IRQ_BUSY;
+	assign specialmemory_use_condition = iDEV_REQ && iDEV_ADDR < 32'h00000400;
+	assign queue_write_condition = ps2_if_req && !data_fifo_full;// && !irq_counter_full;
+	assign data_rd_condition = /*!data_fifo_empty && 2011/10/05*/(iDEV_REQ && iDEV_ADDR == 32'h00000400);                //iDEV_REQ & (iDEV_ADDR < 32'h00000100);
+	assign irq_rd_condition = !irq_counter_empty && !iDEV_IRQ_BUSY;
 
 
 	/************************************************************
@@ -110,7 +110,7 @@ module gci_std_kmc
 		.iCLOCK(iCLOCK),
 		.inRESET(inRESET),
 		.iREMOVE(1'b0),
-		.oCOUNT(/*Not Use*/),
+		.oCOUNT(),
 		.iWR_EN(queue_write_condition),
 		.iWR_DATA(ps2_if_data),
 		.oWR_FULL(data_fifo_full),
@@ -150,12 +150,12 @@ module gci_std_kmc
 	//Data Output Buffer
 	always@(posedge iCLOCK or negedge inRESET)begin
 		if(!inRESET)begin
-			b_req			<=		1'b0;
-			b_data			<=		{32{1'b0}};
+			b_req <= 1'b0;
+			b_data <= {32{1'b0}};
 		end
 		else begin
-			b_req			<=		(specialmemory_use_condition || data_rd_condition);
-			b_data			<=		(specialmemory_use_condition)? special_memory_rd_data : (!data_fifo_empty)?/*2011/10/05*/ {{23{1'b0}}, 1'b1, data_fifo_data} : {32{1'b0}}/*2011/10/05*/;
+			b_req <= (specialmemory_use_condition || data_rd_condition);
+			b_data <= (specialmemory_use_condition)? special_memory_rd_data : (!data_fifo_empty)?/*2011/10/05*/ {{23{1'b0}}, 1'b1, data_fifo_data} : {32{1'b0}}/*2011/10/05*/;
 		end
 	end
 
@@ -165,11 +165,11 @@ module gci_std_kmc
 	/************************************************************
 	Assign
 	************************************************************/
-	assign	oDEV_BUSY		=		iDEV_BUSY;//b_data_out_wait_flag || b_specialdata_out_wait_data;
-	assign	oDEV_REQ		=		b_req;//specialmemory_use_condition || data_rd_condition;
-	assign	oDEV_DATA		=		b_data;//(specialmemory_use_condition)? special_memory_rd_data : {{24{1'b0}}, data_fifo_data};
-	assign	oDEV_IRQ_REQ	=		!iDEV_IRQ_BUSY && b_irq_state;//irq_rd_condition;
-	assign	oDEV_IRQ_DATA	=		{24{1'b0}};
+	assign oDEV_BUSY = iDEV_BUSY;//b_data_out_wait_flag || b_specialdata_out_wait_data;
+	assign oDEV_REQ = b_req;//specialmemory_use_condition || data_rd_condition;
+	assign oDEV_DATA = b_data;//(specialmemory_use_condition)? special_memory_rd_data : {{24{1'b0}}, data_fifo_data};
+	assign oDEV_IRQ_REQ = !iDEV_IRQ_BUSY && b_irq_state;//irq_rd_condition;
+	assign oDEV_IRQ_DATA = {24{1'b0}};
 
 endmodule
 

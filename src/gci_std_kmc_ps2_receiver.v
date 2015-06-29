@@ -14,9 +14,6 @@ module gci_std_kmc_ps2_receiver(
 
 	//PS2 Interface
 	wire [7:0] wRevScancode;
-	//Chattaring
-	wire ps2_clk;
-	wire ps2_data;
 	//State
 	reg bHighFlag;
 	reg [3:0] bState;
@@ -30,11 +27,24 @@ module gci_std_kmc_ps2_receiver(
 		end
 	endgenerate
 
+
+	wire synthronize_psr_clk;
+	wire synthronize_psr_data;
+	gci_std_kmc_synchronizer #(2) PS2_SYNCHRONIZER(
+		.iCLOCK(iCLOCK),
+		.inRESET(inRESET),
+		.iRESET_SYNC(1'b0),
+		.iDATA({iPS2_CLOCK, iPS2_DATA}),
+		.oDATA({synthronize_psr_clk, synthronize_psr_data})
+	);
+
 	//Chattaring Camceller Module
+	wire ps2_clk;
+	wire ps2_data;
 	gci_std_kmc_chatta_can_50mhz_25us #(2) PS2_CHATTA_CAN(
 		.iCLOCK(iCLOCK),
 		.inRESET(inRESET),
-		.iDATA({iPS2_CLOCK, iPS2_DATA}),
+		.iDATA({synthronize_psr_clk, synthronize_psr_data}),
 		.oDATA({ps2_clk, ps2_data})
 	);
 
@@ -42,40 +52,40 @@ module gci_std_kmc_ps2_receiver(
 	//State
 	always@(posedge iCLOCK or negedge inRESET)begin
 		if(!inRESET)begin
-			bHighFlag		<=		1'b0;
-			bState			<=		{4{1'b0}};
-			bPs2Scancode	<=		{8{1'b0}};
+			bHighFlag <= 1'b0;
+			bState <= {4{1'b0}};
+			bPs2Scancode <= {8{1'b0}};
 		end
 		else begin
 			if(bState == 4'hB)begin
-				bState			<=		4'h0;
-				bHighFlag		<=		1'b0;
+				bState <= 4'h0;
+				bHighFlag <= 1'b0;
 			end
 			else if(ps2_clk)begin
-				bHighFlag		<=		1'b1;
+				bHighFlag <= 1'b1;
 			end
 			else if(bHighFlag & !ps2_clk)begin
 				case(bState)
 					4'h0:
 						begin
-							bState			<=		bState + {{3{1'b0}}, 1'b1};
-							bHighFlag		<=		1'b0;
+							bState <= bState + {{3{1'b0}}, 1'b1};
+							bHighFlag <= 1'b0;
 						end
 					4'h1, 4'h2, 4'h3, 4'h4, 4'h5, 4'h6, 4'h7, 4'h8:
 						begin
-							bState			<=		bState + {{3{1'b0}}, 1'b1};
-							bHighFlag		<=		1'b0;
-							bPs2Scancode	<=		((bPs2Scancode << 1) & 8'hFF) |  {7'h00, ps2_data};
+							bState <= bState + {{3{1'b0}}, 1'b1};
+							bHighFlag <= 1'b0;
+							bPs2Scancode <= ((bPs2Scancode << 1) & 8'hFF) |  {7'h00, ps2_data};
 						end
 					4'h9:
 						begin
-							bState			<=		bState + {{3{1'b0}}, 1'b1};
-							bHighFlag		<=		1'b0;
+							bState <= bState + {{3{1'b0}}, 1'b1};
+							bHighFlag <= 1'b0;
 						end
 					default:		//Stop Bit(Data Get End)
 						begin
-							bState			<=		bState + {{3{1'b0}}, 1'b1};
-							bHighFlag		<=		1'b0;
+							bState <= bState + {{3{1'b0}}, 1'b1};
+							bHighFlag <= 1'b0;
 						end
 				endcase
 			end
@@ -86,8 +96,8 @@ module gci_std_kmc_ps2_receiver(
 	/***********************************
 	Output Asssign
 	***********************************/
-	assign		oPS2MOD_REQ		=		(bState == 4'hB)? 1'b1 : 1'b0;
-	assign		oPS2MOD_DATA	=		(bState == 4'hB)? wRevScancode : {8{1'b0}};
+	assign oPS2MOD_REQ = (bState == 4'hB)? 1'b1 : 1'b0;
+	assign oPS2MOD_DATA = (bState == 4'hB)? wRevScancode : {8{1'b0}};
 
 endmodule
 
